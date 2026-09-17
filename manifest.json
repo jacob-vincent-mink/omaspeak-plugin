@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "jacob.omaspeak",
+  "name": "Omaspeak",
+  "version": "1.0.0",
+  "author": "Jacob Mink",
+  "license": "MIT",
+  "description": "Omaspeak text-to-speech configuration in the Omarchy bar.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Omaspeak",
+    "description": "View and configure the Omaspeak TTS daemon.",
+    "category": "Audio",
+    "aliases": ["speak", "omaspeak", "tts"],
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
