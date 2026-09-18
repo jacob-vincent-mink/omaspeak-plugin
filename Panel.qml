@@ -490,64 +490,89 @@ Panel {
               fontFamily: root.fontFamily
             }
 
-            Flickable {
-              id: voiceFlick
+            Item {
               width: parent.width
-              height: Math.min(voiceColumn.implicitHeight, Style.space(260))
-              contentWidth: width
-              contentHeight: voiceColumn.implicitHeight
-              clip: true
-              boundsBehavior: Flickable.StopAtBounds
-              flickableDirection: Flickable.VerticalFlick
-              interactive: voiceColumn.implicitHeight > height
-              ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+              height: Math.min(voiceColumn.childrenRect.height + Style.space(4), Style.space(260))
 
-              Column {
-                id: voiceColumn
-                width: voiceFlick.width
-                spacing: Style.space(2)
-                Repeater {
-                  model: voices
-                  delegate: CursorSurface {
-                    required property var modelData
-                    width: parent.width
-                    foreground: root.foreground
-                    implicitHeight: voiceRow.implicitHeight + Style.space(10)
-                    readonly property bool isActive: modelData.id === root.activeVoiceId
+              BorderSurface {
+                anchors.fill: parent
+                color: "transparent"
+                borderSpec: Border.flat(Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08), 1)
+                radius: Style.cornerRadius
 
-                    MouseArea {
-                      anchors.fill: parent
-                      hoverEnabled: true
-                      cursorShape: Qt.PointingHandCursor
-                      onClicked: {
-                        if (!parent.isActive) root.setVoice(modelData.name)
-                      }
+                Flickable {
+                  id: voiceFlick
+                  anchors.fill: parent
+                  anchors.margins: Style.space(2)
+                  contentWidth: width
+                  contentHeight: voiceColumn.childrenRect.height
+                  clip: true
+                  boundsBehavior: Flickable.StopAtBounds
+                  flickableDirection: Flickable.VerticalFlick
+                  interactive: contentHeight > height
+                  ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                  WheelHandler {
+                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                    orientation: Qt.Vertical
+                    grabPermissions: PointerHandler.CanTakeOverFromAnything
+                    onWheel: function(event) {
+                      if (voiceFlick.contentHeight <= voiceFlick.height) return
+                      voiceFlick.contentY = Math.max(0, Math.min(
+                        voiceFlick.contentHeight - voiceFlick.height,
+                        voiceFlick.contentY - event.angleDelta.y * 0.5))
+                      event.accepted = true
                     }
+                  }
 
-                    RowLayout {
-                      id: voiceRow
-                      anchors.left: parent.left
-                      anchors.right: parent.right
-                      anchors.verticalCenter: parent.verticalCenter
-                      anchors.leftMargin: Style.space(8)
-                      anchors.rightMargin: Style.space(8)
-                      spacing: Style.space(8)
+                  Column {
+                    id: voiceColumn
+                    width: voiceFlick.width
+                    spacing: Style.space(2)
+                    Repeater {
+                      model: voices
+                      delegate: CursorSurface {
+                        required property var modelData
+                        width: parent.width
+                        foreground: root.foreground
+                        implicitHeight: voiceRow.implicitHeight + Style.space(10)
+                        readonly property bool isActive: modelData.id === root.activeVoiceId
 
-                      Text {
-                        text: modelData.name || "?"
-                        textFormat: Text.PlainText
-                        color: root.foreground
-                        font.family: root.fontFamily
-                        font.pixelSize: Style.font.body
-                        Layout.fillWidth: true
-                        elide: Text.ElideRight
-                      }
-                      Text {
-                        text: parent.parent.isActive ? "active" : ""
-                        textFormat: Text.PlainText
-                        color: Color.accent
-                        font.family: root.fontFamily
-                        font.pixelSize: Style.font.bodySmall
+                        MouseArea {
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: {
+                            if (!parent.isActive) root.setVoice(modelData.name)
+                          }
+                        }
+
+                        RowLayout {
+                          id: voiceRow
+                          anchors.left: parent.left
+                          anchors.right: parent.right
+                          anchors.verticalCenter: parent.verticalCenter
+                          anchors.leftMargin: Style.space(8)
+                          anchors.rightMargin: Style.space(8)
+                          spacing: Style.space(8)
+
+                          Text {
+                            text: modelData.name || "?"
+                            textFormat: Text.PlainText
+                            color: root.foreground
+                            font.family: root.fontFamily
+                            font.pixelSize: Style.font.body
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                          }
+                          Text {
+                            text: parent.parent.isActive ? "active" : ""
+                            textFormat: Text.PlainText
+                            color: Color.accent
+                            font.family: root.fontFamily
+                            font.pixelSize: Style.font.bodySmall
+                          }
+                        }
                       }
                     }
                   }
