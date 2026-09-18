@@ -397,7 +397,7 @@ Panel {
               }
               Text {
                 width: parent.width
-                text: "Install it with:  omarchy install omaspeak"
+                text: "Install it with:  pacman -S omaspeak-bin"
                 textFormat: Text.PlainText
                 color: root.dim
                 font.family: root.fontFamily
