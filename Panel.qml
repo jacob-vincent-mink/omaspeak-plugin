@@ -26,25 +26,24 @@ Panel {
   property string sayText: ""
   property bool actionBusy: false
   property string actionError: ""
+  property bool voiceMenuOpen: false
 
   readonly property bool daemonRunning: Model.isDaemonRunning(statusData)
   readonly property string modelName: Model.modelName(statusData)
   readonly property string backendName: Model.backendName(statusData)
-  readonly property int activeVoiceId: Model.activeVoiceId(statusData)
 
-  readonly property var voiceOptions: {
-    var opts = [{label: "Default", value: ""}]
+  readonly property string activeVoiceName: {
     for (var i = 0; i < voices.length; i++) {
-      opts.push({label: voices[i].name, value: voices[i].name})
+      if (voices[i].active === true) return voices[i].name
     }
-    return opts
+    return ""
   }
 
-  readonly property int currentVoiceIndex: {
-    for (var i = 0; i < voices.length; i++) {
-      if (voices[i].active === true) return i + 1 // +1 for Default at index 0
-    }
-    return 0 // Default
+  readonly property bool hasExplicitVoice: {
+    // Check if config explicitly sets a voice (not just model default)
+    // We infer this from whether voices returns an explicit active match
+    // vs the first voice being active by default
+    return activeVoiceName !== ""
   }
 
   implicitWidth: button.implicitWidth
@@ -57,6 +56,7 @@ Panel {
       Qt.callLater(function() { keyCatcher.forceActiveFocus() })
     } else {
       refreshTimer.stop()
+      voiceMenuOpen = false
       sayText = ""
       actionError = ""
     }
@@ -114,6 +114,7 @@ Panel {
   function setVoice(voiceName) {
     actionBusy = true
     actionError = ""
+    voiceMenuOpen = false
     voiceProc.command = ["omaspeak", "config", "set", "model.voice", voiceName]
     voiceProc.running = true
   }
@@ -121,6 +122,7 @@ Panel {
   function unsetVoice() {
     actionBusy = true
     actionError = ""
+    voiceMenuOpen = false
     voiceProc.command = ["omaspeak", "config", "unset", "model.voice"]
     voiceProc.running = true
   }
@@ -285,7 +287,7 @@ Panel {
     open: root.opened
     focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(360))
-    contentHeight: panel.fittedContentHeight(contentColumn.implicitHeight, Style.space(520))
+    contentHeight: panel.fittedContentHeight(contentColumn.implicitHeight, Style.space(480))
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -513,17 +515,79 @@ Panel {
               fontFamily: root.fontFamily
             }
 
-            ComboBox {
-              id: voiceCombo
+            // Voice picker header — current selection
+            CursorSurface {
               width: parent.width
-              model: root.voiceOptions
-              textRole: "label"
-              valueRole: "value"
-              currentIndex: root.currentVoiceIndex
-              onActivated: function(index) {
-                var item = root.voiceOptions[index]
-                if (item.value === "") root.unsetVoice()
-                else root.setVoice(item.value)
+              foreground: root.foreground
+              implicitHeight: voiceHeaderRow.implicitHeight + Style.space(14)
+
+              MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.voiceMenuOpen = !root.voiceMenuOpen
+              }
+
+              RowLayout {
+                id: voiceHeaderRow
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: Style.space(10)
+                anchors.rightMargin: Style.space(10)
+                spacing: Style.space(8)
+
+                Text {
+                  text: root.activeVoiceName || "Default"
+                  textFormat: Text.PlainText
+                  color: root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                  Layout.fillWidth: true
+                  elide: Text.ElideRight
+                }
+                Text {
+                  text: root.voiceMenuOpen ? "\uf077" : "\uf078"
+                  color: root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.icon
+                }
+              }
+            }
+
+            // Expanded voice list
+            BorderSurface {
+              visible: root.voiceMenuOpen
+              width: parent.width
+              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
+              borderSpec: Border.flat(Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.12), 1)
+              radius: Style.cornerRadius
+              implicitHeight: voiceListColumn.implicitHeight + Style.space(8)
+
+              Column {
+                id: voiceListColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Style.space(4)
+                spacing: Style.space(1)
+
+                // Default option
+                VoiceRow {
+                  label: "Default"
+                  selected: root.activeVoiceName === ""
+                  onClicked: root.unsetVoice()
+                }
+
+                Repeater {
+                  model: voices
+                  delegate: VoiceRow {
+                    required property var modelData
+                    label: modelData.name
+                    selected: modelData.active === true
+                    onClicked: root.setVoice(modelData.name)
+                  }
+                }
               }
             }
           }
@@ -548,6 +612,49 @@ Panel {
             }
           }
         }
+      }
+    }
+  }
+
+  component VoiceRow: CursorSurface {
+    property string label: ""
+    property bool selected: false
+    signal clicked()
+
+    width: parent.width
+    foreground: root.foreground
+    implicitHeight: row.implicitHeight + Style.space(12)
+
+    MouseArea {
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: parent.clicked()
+    }
+
+    RowLayout {
+      id: row
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.leftMargin: Style.space(10)
+      anchors.rightMargin: Style.space(10)
+      spacing: Style.space(8)
+
+      Text {
+        text: parent.parent.label
+        textFormat: Text.PlainText
+        color: root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        Layout.fillWidth: true
+        elide: Text.ElideRight
+      }
+      Text {
+        text: parent.parent.selected ? "\uf00c" : ""
+        color: Color.accent
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.icon
       }
     }
   }
