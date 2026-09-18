@@ -27,23 +27,20 @@ Panel {
   property bool actionBusy: false
   property string actionError: ""
   property bool voiceMenuOpen: false
+  property string configuredVoice: "" // raw config value; empty means not explicitly set
 
   readonly property bool daemonRunning: Model.isDaemonRunning(statusData)
   readonly property string modelName: Model.modelName(statusData)
   readonly property string backendName: Model.backendName(statusData)
 
-  readonly property string activeVoiceName: {
+  readonly property string effectiveVoiceLabel: {
+    if (root.configuredVoice === "") return "Default"
+    // configuredVoice may be a numeric ID or a name string
     for (var i = 0; i < voices.length; i++) {
-      if (voices[i].active === true) return voices[i].name
+      if (String(voices[i].id) === root.configuredVoice) return voices[i].name
+      if (voices[i].name === root.configuredVoice) return voices[i].name
     }
-    return ""
-  }
-
-  readonly property bool hasExplicitVoice: {
-    // Check if config explicitly sets a voice (not just model default)
-    // We infer this from whether voices returns an explicit active match
-    // vs the first voice being active by default
-    return activeVoiceName !== ""
+    return root.configuredVoice
   }
 
   implicitWidth: button.implicitWidth
@@ -80,6 +77,11 @@ Panel {
   function refreshVoices() {
     if (!binaryFound) return
     voicesProc.running = true
+  }
+
+  function refreshConfigVoice() {
+    if (!binaryFound) return
+    configVoiceProc.running = true
   }
 
   function doAction(args) {
@@ -143,6 +145,7 @@ Panel {
         checkUnit()
         refreshStatus()
         refreshVoices()
+        refreshConfigVoice()
       }
     }
   }
@@ -193,6 +196,30 @@ Panel {
   }
 
   Process {
+    id: configVoiceProc
+    command: ["omaspeak", "config", "get", "model.voice"]
+    running: false
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var raw = String(text || "").trim()
+        // When unset, omaspeak config get returns empty or the default numeric id
+        // We treat empty, "null", and "0" as "Default" since 0 is the first voice
+        // which is the model default. Actually let's be conservative:
+        // only empty/null means explicitly default.
+        if (raw === "" || raw === "null" || raw === "undefined") {
+          root.configuredVoice = ""
+        } else {
+          root.configuredVoice = raw
+        }
+      }
+    }
+    onExited: function(code) {
+      if (code !== 0) root.configuredVoice = ""
+    }
+  }
+
+  Process {
     id: actionProc
     command: []
     running: false
@@ -231,6 +258,7 @@ Panel {
       actionBusy = false
       if (code !== 0) actionError = "Could not change voice"
       refreshAfterDelay(300)
+      refreshConfigVoice()
     }
   }
 
@@ -248,6 +276,7 @@ Panel {
       if (binaryFound) {
         refreshStatus()
         refreshVoices()
+        refreshConfigVoice()
       }
     }
   }
@@ -538,7 +567,7 @@ Panel {
                 spacing: Style.space(8)
 
                 Text {
-                  text: root.activeVoiceName || "Default"
+                  text: root.effectiveVoiceLabel
                   textFormat: Text.PlainText
                   color: root.foreground
                   font.family: root.fontFamily
@@ -575,7 +604,7 @@ Panel {
                 // Default option
                 VoiceRow {
                   label: "Default"
-                  selected: root.activeVoiceName === ""
+                  selected: root.configuredVoice === ""
                   onClicked: root.unsetVoice()
                 }
 
@@ -584,7 +613,10 @@ Panel {
                   delegate: VoiceRow {
                     required property var modelData
                     label: modelData.name
-                    selected: modelData.active === true
+                    selected: {
+                      if (root.configuredVoice === "") return false
+                      return String(modelData.id) === root.configuredVoice || modelData.name === root.configuredVoice
+                    }
                     onClicked: root.setVoice(modelData.name)
                   }
                 }
