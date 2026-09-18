@@ -272,11 +272,7 @@ Panel {
     running: true
     triggeredOnStart: true
     onTriggered: {
-      if (binaryFound) {
-        refreshStatus()
-      } else if (!checking) {
-        checkBinary()
-      }
+      if (!checking) checkBinary()
     }
   }
 
