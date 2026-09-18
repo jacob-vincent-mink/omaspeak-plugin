@@ -27,15 +27,14 @@ Panel {
   property bool actionBusy: false
   property string actionError: ""
   property bool voiceMenuOpen: false
-  property string configuredVoice: "" // raw config value; empty means not explicitly set
+  property string configuredVoice: ""
 
   readonly property bool daemonRunning: Model.isDaemonRunning(statusData)
   readonly property string modelName: Model.modelName(statusData)
   readonly property string backendName: Model.backendName(statusData)
 
   readonly property string effectiveVoiceLabel: {
-    if (root.configuredVoice === "") return "Default"
-    // configuredVoice may be a numeric ID or a name string
+    if (root.configuredVoice === "" || root.configuredVoice === "0") return "Default"
     for (var i = 0; i < voices.length; i++) {
       if (String(voices[i].id) === root.configuredVoice) return voices[i].name
       if (voices[i].name === root.configuredVoice) return voices[i].name
@@ -48,7 +47,6 @@ Panel {
 
   onOpenedChanged: {
     if (opened) {
-      checkBinary()
       refreshTimer.start()
       Qt.callLater(function() { keyCatcher.forceActiveFocus() })
     } else {
@@ -58,6 +56,8 @@ Panel {
       actionError = ""
     }
   }
+
+  Component.onCompleted: checkBinary()
 
   function checkBinary() {
     checking = true
@@ -203,10 +203,6 @@ Panel {
       waitForEnd: true
       onStreamFinished: {
         var raw = String(text || "").trim()
-        // When unset, omaspeak config get returns empty or the default numeric id
-        // We treat empty, "null", and "0" as "Default" since 0 is the first voice
-        // which is the model default. Actually let's be conservative:
-        // only empty/null means explicitly default.
         if (raw === "" || raw === "null" || raw === "undefined") {
           root.configuredVoice = ""
         } else {
@@ -268,6 +264,22 @@ Panel {
     running: false
   }
 
+  // Background refresh: keeps the bar icon accurate even when panel is closed
+  Timer {
+    id: bgRefreshTimer
+    interval: 10000
+    repeat: true
+    running: true
+    triggeredOnStart: true
+    onTriggered: {
+      if (binaryFound) {
+        refreshStatus()
+      } else if (!checking) {
+        checkBinary()
+      }
+    }
+  }
+
   Timer {
     id: refreshTimer
     interval: 5000
@@ -288,6 +300,7 @@ Panel {
     onTriggered: {
       refreshStatus()
       refreshVoices()
+      refreshConfigVoice()
     }
   }
 
@@ -544,7 +557,6 @@ Panel {
               fontFamily: root.fontFamily
             }
 
-            // Voice picker header — current selection
             CursorSurface {
               width: parent.width
               foreground: root.foreground
@@ -584,7 +596,6 @@ Panel {
               }
             }
 
-            // Expanded voice list
             BorderSurface {
               visible: root.voiceMenuOpen
               width: parent.width
@@ -601,10 +612,9 @@ Panel {
                 anchors.margins: Style.space(4)
                 spacing: Style.space(1)
 
-                // Default option
                 VoiceRow {
                   label: "Default"
-                  selected: root.configuredVoice === ""
+                  selected: root.configuredVoice === "" || root.configuredVoice === "0"
                   onClicked: root.unsetVoice()
                 }
 
@@ -614,7 +624,7 @@ Panel {
                     required property var modelData
                     label: modelData.name
                     selected: {
-                      if (root.configuredVoice === "") return false
+                      if (root.configuredVoice === "" || root.configuredVoice === "0") return false
                       return String(modelData.id) === root.configuredVoice || modelData.name === root.configuredVoice
                     }
                     onClicked: root.setVoice(modelData.name)
