@@ -32,6 +32,21 @@ Panel {
   readonly property string backendName: Model.backendName(statusData)
   readonly property int activeVoiceId: Model.activeVoiceId(statusData)
 
+  readonly property var voiceOptions: {
+    var opts = [{label: "Default", value: ""}]
+    for (var i = 0; i < voices.length; i++) {
+      opts.push({label: voices[i].name, value: voices[i].name})
+    }
+    return opts
+  }
+
+  readonly property int currentVoiceIndex: {
+    for (var i = 0; i < voices.length; i++) {
+      if (voices[i].active === true) return i + 1 // +1 for Default at index 0
+    }
+    return 0 // Default
+  }
+
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
@@ -91,6 +106,7 @@ Panel {
     if (!text || !text.trim()) return
     actionBusy = true
     actionError = ""
+    sayText = ""
     sayProc.command = ["omaspeak", "say", text.trim()]
     sayProc.running = true
   }
@@ -99,6 +115,13 @@ Panel {
     actionBusy = true
     actionError = ""
     voiceProc.command = ["omaspeak", "config", "set", "model.voice", voiceName]
+    voiceProc.running = true
+  }
+
+  function unsetVoice() {
+    actionBusy = true
+    actionError = ""
+    voiceProc.command = ["omaspeak", "config", "unset", "model.voice"]
     voiceProc.running = true
   }
 
@@ -262,7 +285,7 @@ Panel {
     open: root.opened
     focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(360))
-    contentHeight: panel.fittedContentHeight(contentColumn.implicitHeight, Style.space(560))
+    contentHeight: panel.fittedContentHeight(contentColumn.implicitHeight, Style.space(520))
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -485,98 +508,22 @@ Panel {
             spacing: Style.space(10)
 
             PanelSectionHeader {
-              text: "VOICES  " + voices.length
+              text: "VOICE"
               foreground: root.foreground
               fontFamily: root.fontFamily
             }
 
-            Item {
+            ComboBox {
+              id: voiceCombo
               width: parent.width
-              height: Math.min(voiceColumn.childrenRect.height + Style.space(4), Style.space(260))
-
-              BorderSurface {
-                anchors.fill: parent
-                color: "transparent"
-                borderSpec: Border.flat(Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08), 1)
-                radius: Style.cornerRadius
-
-                Flickable {
-                  id: voiceFlick
-                  anchors.fill: parent
-                  anchors.margins: Style.space(2)
-                  contentWidth: width
-                  contentHeight: voiceColumn.childrenRect.height
-                  clip: true
-                  boundsBehavior: Flickable.StopAtBounds
-                  flickableDirection: Flickable.VerticalFlick
-                  interactive: contentHeight > height
-                  ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-
-                  WheelHandler {
-                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                    orientation: Qt.Vertical
-                    grabPermissions: PointerHandler.CanTakeOverFromAnything
-                    onWheel: function(event) {
-                      if (voiceFlick.contentHeight <= voiceFlick.height) return
-                      voiceFlick.contentY = Math.max(0, Math.min(
-                        voiceFlick.contentHeight - voiceFlick.height,
-                        voiceFlick.contentY - event.angleDelta.y * 0.5))
-                      event.accepted = true
-                    }
-                  }
-
-                  Column {
-                    id: voiceColumn
-                    width: voiceFlick.width
-                    spacing: Style.space(2)
-                    Repeater {
-                      model: voices
-                      delegate: CursorSurface {
-                        required property var modelData
-                        width: parent.width
-                        foreground: root.foreground
-                        implicitHeight: voiceRow.implicitHeight + Style.space(10)
-                        readonly property bool isActive: modelData.id === root.activeVoiceId
-
-                        MouseArea {
-                          anchors.fill: parent
-                          hoverEnabled: true
-                          cursorShape: Qt.PointingHandCursor
-                          onClicked: {
-                            if (!parent.isActive) root.setVoice(modelData.name)
-                          }
-                        }
-
-                        RowLayout {
-                          id: voiceRow
-                          anchors.left: parent.left
-                          anchors.right: parent.right
-                          anchors.verticalCenter: parent.verticalCenter
-                          anchors.leftMargin: Style.space(8)
-                          anchors.rightMargin: Style.space(8)
-                          spacing: Style.space(8)
-
-                          Text {
-                            text: modelData.name || "?"
-                            textFormat: Text.PlainText
-                            color: root.foreground
-                            font.family: root.fontFamily
-                            font.pixelSize: Style.font.body
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                          }
-                          Text {
-                            text: parent.parent.isActive ? "active" : ""
-                            textFormat: Text.PlainText
-                            color: Color.accent
-                            font.family: root.fontFamily
-                            font.pixelSize: Style.font.bodySmall
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
+              model: root.voiceOptions
+              textRole: "label"
+              valueRole: "value"
+              currentIndex: root.currentVoiceIndex
+              onActivated: function(index) {
+                var item = root.voiceOptions[index]
+                if (item.value === "") root.unsetVoice()
+                else root.setVoice(item.value)
               }
             }
           }
