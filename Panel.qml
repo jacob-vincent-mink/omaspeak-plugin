@@ -304,7 +304,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "\uf4ad"
+    text: "\uf075"
     active: daemonRunning
     tooltipText: "Omaspeak" + (daemonRunning ? " · running" : " · stopped")
     onPressed: function(buttonCode) {
@@ -360,7 +360,7 @@ Panel {
             fontFamily: root.fontFamily
             iconComponent: Component {
               Text {
-                text: "\uf4ad"
+                text: "\uf075"
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.display
