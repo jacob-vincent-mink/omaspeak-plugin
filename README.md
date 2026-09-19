@@ -77,8 +77,11 @@ and are not fetched by this widget.
 ## Checks
 
 ```bash
-node --test tests/
+node --test tests/*.test.cjs
 ```
+
+The runner is given a file glob rather than the directory, because current Node
+reports the directory itself as a single failing test.
 
 Covers the status and voice parsing, the running and service-present states,
 the active voice, and the backend display. Node is needed only for these
