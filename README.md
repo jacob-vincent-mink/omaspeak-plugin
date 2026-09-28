@@ -14,7 +14,7 @@ active, while a configuration without a pinned voice reads `Default`.
 ## Requirements
 
 - Omarchy Quattro with shell plugin support
-- The `omaspeak-bin` package on `PATH`, because the widget drives the `omaspeak` command line
+- An installed `omaspeak` executable. The widget prefers `~/.local/bin/omaspeak` (including RC installs) and falls back to `PATH`.
 - A systemd user session, because the daemon runs as the `omaspeak` user service
 
 ## Install
@@ -31,6 +31,12 @@ Click the icon to open the panel. Press **Set up the service** once, so the
 running `omaspeak setup systemd`, which installs and enables the user service.
 When the binary is missing the panel reports **Not installed** and prints the
 install command instead of failing.
+
+The service control checks systemd’s effective `ExecStart`. If a packaged unit
+points at `/usr/bin/omaspeak` while the RC executable is in `~/.local/bin`,
+**Set up RC service** runs the selected executable’s `setup systemd` command
+to create a user unit. **Start** appears only when the service points at that
+selected executable.
 
 ## Remove
 
