@@ -19,6 +19,8 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
   property bool binaryFound: false
+  property string binaryPath: ""
+  property bool unitUsesBinary: false
   property bool checking: false
   property bool unitInstalled: false
   property var statusData: null
@@ -67,6 +69,7 @@ Panel {
   function checkUnit() {
     if (!binaryFound) return
     unitCheck.running = true
+    unitExecCheck.running = true
   }
 
   function refreshStatus() {
@@ -87,7 +90,7 @@ Panel {
   function doAction(args) {
     actionBusy = true
     actionError = ""
-    actionProc.command = ["omaspeak"].concat(args)
+    actionProc.command = [binaryPath].concat(args)
     actionProc.running = true
   }
 
@@ -99,7 +102,7 @@ Panel {
   }
 
   function launchTerminal(args) {
-    launchProc.command = ["omarchy", "launch", "terminal"].concat(args)
+    launchProc.command = ["omarchy", "launch", "terminal", binaryPath].concat(args)
     launchProc.running = true
     root.close()
   }
@@ -109,7 +112,7 @@ Panel {
     actionBusy = true
     actionError = ""
     sayText = ""
-    sayProc.command = ["omaspeak", "say", text.trim()]
+    sayProc.command = [binaryPath, "say", text.trim()]
     sayProc.running = true
   }
 
@@ -117,7 +120,7 @@ Panel {
     actionBusy = true
     actionError = ""
     voiceMenuOpen = false
-    voiceProc.command = ["omaspeak", "config", "set", "model.voice", voiceName]
+    voiceProc.command = [binaryPath, "config", "set", "model.voice", voiceName]
     voiceProc.running = true
   }
 
@@ -125,7 +128,7 @@ Panel {
     actionBusy = true
     actionError = ""
     voiceMenuOpen = false
-    voiceProc.command = ["omaspeak", "config", "unset", "model.voice"]
+    voiceProc.command = [binaryPath, "config", "unset", "model.voice"]
     voiceProc.running = true
   }
 
@@ -138,8 +141,12 @@ Panel {
     id: binaryCheck
     command: ["sh", "-c", "command -v omaspeak"]
     running: false
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: binaryPath = String(text || "").trim()
+    }
     onExited: function(code) {
-      binaryFound = (code === 0)
+      binaryFound = (code === 0 && binaryPath !== "")
       checking = false
       if (binaryFound) {
         checkUnit()
@@ -166,8 +173,21 @@ Panel {
   }
 
   Process {
+    id: unitExecCheck
+    command: ["systemctl", "--user", "show", "omaspeak", "--property=ExecStart", "--value"]
+    running: false
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: unitUsesBinary = root.binaryPath !== "" && String(text || "").indexOf("path=" + root.binaryPath + " ") !== -1
+    }
+    onExited: function(code) {
+      if (code !== 0) unitUsesBinary = false
+    }
+  }
+
+  Process {
     id: statusProc
-    command: ["omaspeak", "status", "--json"]
+    command: [root.binaryPath, "status", "--json"]
     running: false
     stdout: StdioCollector {
       waitForEnd: true
@@ -182,7 +202,7 @@ Panel {
 
   Process {
     id: voicesProc
-    command: ["omaspeak", "voices", "--json"]
+    command: [root.binaryPath, "voices", "--json"]
     running: false
     stdout: StdioCollector {
       waitForEnd: true
@@ -197,7 +217,7 @@ Panel {
 
   Process {
     id: configVoiceProc
-    command: ["omaspeak", "config", "get", "model.voice"]
+    command: [root.binaryPath, "config", "get", "model.voice"]
     running: false
     stdout: StdioCollector {
       waitForEnd: true
@@ -457,16 +477,16 @@ Panel {
             spacing: Style.space(6)
 
             Button {
-              visible: !unitInstalled
-              text: "Install daemon"
+              visible: !unitUsesBinary
+              text: "Set up service"
               enabled: !actionBusy
               foreground: root.foreground
               fontFamily: root.fontFamily
               fontSize: Style.font.bodySmall
-              onClicked: launchTerminal(["omaspeak", "setup", "systemd"])
+              onClicked: launchTerminal(["setup", "systemd"])
             }
             Button {
-              visible: unitInstalled && !daemonRunning
+              visible: unitUsesBinary && !daemonRunning
               text: "Start"
               enabled: !actionBusy
               foreground: root.foreground
@@ -475,7 +495,7 @@ Panel {
               onClicked: doSystemctl(["start", "omaspeak"])
             }
             Button {
-              visible: daemonRunning && unitInstalled
+              visible: daemonRunning && unitUsesBinary
               text: "Stop"
               enabled: !actionBusy
               foreground: root.foreground
@@ -646,7 +666,7 @@ Panel {
               foreground: root.foreground
               fontFamily: root.fontFamily
               fontSize: Style.font.body
-              onClicked: launchTerminal(["omaspeak", "setup"])
+              onClicked: launchTerminal(["setup"])
             }
           }
         }
