@@ -139,7 +139,7 @@ Panel {
 
   Process {
     id: binaryCheck
-    command: ["sh", "-c", "if [ -x \"$HOME/.local/bin/omaspeak\" ]; then printf '%s\\n' \"$HOME/.local/bin/omaspeak\"; else command -v omaspeak; fi"]
+    command: ["sh", "-c", "command -v omaspeak"]
     running: false
     stdout: StdioCollector {
       waitForEnd: true
@@ -478,7 +478,7 @@ Panel {
 
             Button {
               visible: !unitUsesBinary
-              text: "Set up RC service"
+              text: "Set up service"
               enabled: !actionBusy
               foreground: root.foreground
               fontFamily: root.fontFamily
